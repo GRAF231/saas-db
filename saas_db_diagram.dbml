@@ -1,0 +1,425 @@
+// SaaS-платформа с мультиарендностью - Диаграмма БД
+// Используйте этот код на dbdiagram.io для визуализации
+
+// ЯДРО ПЛАТФОРМЫ
+Table clients {
+  id uuid [pk]
+  name varchar [not null]
+  legal_name varchar [not null]
+  tax_id varchar
+  address text
+  contact_person varchar
+  phone varchar
+  email varchar [not null]
+  status varchar [default: 'active']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  extra_data jsonb
+}
+
+Table portals {
+  id uuid [pk]
+  client_id uuid [ref: > clients.id, not null]
+  name varchar [not null]
+  subdomain varchar [not null, unique]
+  description text
+  logo_url varchar
+  primary_color varchar
+  currency_code char(3) [ref: > currencies.code, default: 'USD']
+  timezone varchar [default: 'UTC']
+  status varchar [default: 'active']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  extra_data jsonb
+}
+
+Table currencies {
+  code char(3) [pk]
+  name varchar [not null]
+  symbol varchar [not null]
+  decimal_places smallint [default: 2]
+  is_active boolean [default: true]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table users {
+  id uuid [pk]
+  email varchar [not null, unique]
+  password_hash varchar
+  first_name varchar
+  last_name varchar
+  phone varchar
+  avatar_url varchar
+  locale varchar [default: 'en']
+  is_superadmin boolean [default: false]
+  is_platform_admin boolean [default: false]
+  last_login_at timestamp
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  extra_data jsonb
+}
+
+Table portal_users {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  user_id uuid [ref: > users.id, not null]
+  role varchar [not null, default: 'user']
+  status varchar [default: 'active']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  extra_data jsonb
+
+  indexes {
+    (portal_id, user_id) [unique]
+  }
+}
+
+Table modules {
+  id uuid [pk]
+  name varchar [not null, unique]
+  code varchar [not null, unique]
+  description text
+  version varchar
+  is_core boolean [default: false]
+  dependencies jsonb
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table plans {
+  id uuid [pk]
+  name varchar [not null]
+  description text
+  is_active boolean [default: true]
+  max_users int
+  max_storage_gb int
+  price_monthly decimal(12,2)
+  price_yearly decimal(12,2)
+  features jsonb
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table module_prices {
+  id uuid [pk]
+  module_id uuid [ref: > modules.id, not null]
+  currency_code char(3) [ref: > currencies.code, not null]
+  price_monthly decimal(12,2) [not null]
+  price_yearly decimal(12,2) [not null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (module_id, currency_code) [unique]
+  }
+}
+
+Table portal_modules {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  module_id uuid [ref: > modules.id, not null]
+  status varchar [default: 'active']
+  activated_at timestamp [default: `now()`]
+  expires_at timestamp
+  settings jsonb
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (portal_id, module_id) [unique]
+  }
+}
+
+Table subscriptions {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  plan_id uuid [ref: > plans.id, not null]
+  status varchar [default: 'active']
+  start_date date [not null]
+  end_date date
+  billing_cycle varchar [default: 'monthly']
+  price decimal(12,2) [not null]
+  currency_code char(3) [ref: > currencies.code, not null]
+  auto_renew boolean [default: true]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  extra_data jsonb
+}
+
+Table payments {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  subscription_id uuid [ref: > subscriptions.id]
+  amount decimal(12,2) [not null]
+  currency_code char(3) [ref: > currencies.code, not null]
+  payment_method varchar
+  status varchar [default: 'pending']
+  transaction_id varchar
+  payment_date timestamp
+  description text
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table invoices {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  subscription_id uuid [ref: > subscriptions.id]
+  invoice_number varchar [not null]
+  amount decimal(12,2) [not null]
+  currency_code char(3) [ref: > currencies.code, not null]
+  status varchar [default: 'pending']
+  issue_date date [not null]
+  due_date date [not null]
+  paid_date date
+  pdf_url varchar
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table api_keys {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  name varchar [not null]
+  api_key varchar [not null, unique]
+  is_active boolean [default: true]
+  permissions jsonb
+  expires_at timestamp
+  last_used_at timestamp
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table backups {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  name varchar [not null]
+  size_bytes bigint
+  backup_type varchar [default: 'full']
+  status varchar [default: 'completed']
+  storage_path varchar
+  created_by uuid [ref: > users.id]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table log_actions {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id]
+  user_id uuid [ref: > users.id]
+  action_type varchar [not null]
+  entity_type varchar
+  entity_id uuid
+  ip_address varchar
+  user_agent text
+  details jsonb
+  created_at timestamp [default: `now()`]
+}
+
+// МОДУЛЬ СТРУКТУРЫ КОМПАНИИ
+Table departments {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  parent_id uuid [ref: > departments.id]
+  name varchar [not null]
+  code varchar
+  description text
+  head_position_id uuid [ref: > positions.id]
+  is_active boolean [default: true]
+  order_index int [default: 0]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  extra_data jsonb
+}
+
+Table positions {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  department_id uuid [ref: > departments.id, not null]
+  name varchar [not null]
+  code varchar
+  description text
+  is_manager boolean [default: false]
+  grade varchar
+  number_of_vacancies int [default: 1]
+  is_active boolean [default: true]
+  order_index int [default: 0]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  extra_data jsonb
+}
+
+Table employees {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  user_id uuid [ref: > users.id]
+  first_name varchar [not null]
+  last_name varchar [not null]
+  middle_name varchar
+  email varchar
+  phone varchar
+  hire_date date
+  termination_date date
+  employee_number varchar
+  birth_date date
+  gender varchar
+  photo_url varchar
+  status varchar [default: 'active']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  extra_data jsonb
+}
+
+Table employee_positions {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  employee_id uuid [ref: > employees.id, not null]
+  position_id uuid [ref: > positions.id, not null]
+  is_primary boolean [default: true]
+  start_date date [not null]
+  end_date date
+  status varchar [default: 'active']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (employee_id, position_id, start_date) [unique]
+  }
+}
+
+Table functions {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  position_id uuid [ref: > positions.id, not null]
+  name varchar [not null]
+  description text
+  is_required boolean [default: true]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table vacancies {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  position_id uuid [ref: > positions.id, not null]
+  title varchar [not null]
+  description text
+  requirements text
+  is_published boolean [default: false]
+  published_at timestamp
+  status varchar [default: 'open']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  extra_data jsonb
+}
+
+Table interns {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  department_id uuid [ref: > departments.id, not null]
+  position_id uuid [ref: > positions.id]
+  first_name varchar [not null]
+  last_name varchar [not null]
+  email varchar
+  phone varchar
+  start_date date [not null]
+  end_date date
+  mentor_id uuid [ref: > employees.id]
+  status varchar [default: 'active']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  extra_data jsonb
+}
+
+Table reserves {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  employee_id uuid [ref: > employees.id, not null]
+  target_position_id uuid [ref: > positions.id, not null]
+  readiness_level varchar
+  development_plan text
+  status varchar [default: 'active']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  extra_data jsonb
+}
+
+Table department_roles {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id]
+  name varchar [not null]
+  code varchar [not null]
+  description text
+  permissions jsonb
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table employee_department_roles {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  employee_id uuid [ref: > employees.id, not null]
+  department_id uuid [ref: > departments.id, not null]
+  department_role_id uuid [ref: > department_roles.id, not null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (employee_id, department_id, department_role_id) [unique]
+  }
+}
+
+Table structure_settings {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  setting_key varchar [not null]
+  setting_value jsonb [not null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (portal_id, setting_key) [unique]
+  }
+}
+
+Table visibility_settings {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  entity_type varchar [not null]
+  entity_id uuid [not null]
+  is_visible boolean [default: true]
+  visible_for jsonb
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (portal_id, entity_type, entity_id) [unique]
+  }
+}
+
+Table access_rights {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  role_id uuid [not null]
+  entity_type varchar [not null]
+  permission varchar [not null]
+  is_allowed boolean [default: true]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (portal_id, role_id, entity_type, permission) [unique]
+  }
+}
+
+Table structure_versions {
+  id uuid [pk]
+  portal_id uuid [ref: > portals.id, not null]
+  version_number int [not null]
+  description text
+  created_by uuid [ref: > users.id]
+  structure_data jsonb [not null]
+  is_current boolean [default: false]
+  created_at timestamp [default: `now()`]
+}
